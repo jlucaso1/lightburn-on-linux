@@ -27,6 +27,7 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
   "${mounts[@]}" --proc /proc --dev /dev \
   --bind "$work" /validation --bind "$work/tmp" /tmp \
   --clearenv --setenv PATH /usr/bin --setenv HOME /validation/home \
+  --setenv HOST_NET_NS "$(readlink /proc/self/ns/net)" \
   --setenv LANG C.UTF-8 --setenv WINEPREFIX /validation/prefix --setenv WINEARCH win64 \
   --setenv XDG_RUNTIME_DIR /validation/runtime --setenv XDG_CACHE_HOME /validation/home/cache \
   --setenv XDG_CONFIG_HOME /validation/home/config --setenv XDG_DATA_HOME /validation/home/data \
@@ -35,6 +36,12 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
   xvfb-run -a -s '-screen 0 1280x900x24 -nolisten tcp -extension GLX' \
   bash -c 'set -euo pipefail
     [[ ! -e /sys && ! -e /dev/dri && ! -e /dev/bus/usb && ! -e /home ]]
+    [[ $(readlink /proc/self/ns/net) != "$HOST_NET_NS" ]]
+    [[ $(wc -l < /proc/net/route) == 1 ]]
+    for field in CapInh CapPrm CapEff CapBnd CapAmb; do
+      grep -Eq "^${field}:[[:space:]]+0+$" /proc/self/status
+    done
+    grep -Eq "^NoNewPrivs:[[:space:]]+1$" /proc/self/status
     "$1" --version
     "$1" /validation/shim-com.exe | tee /validation/source.log
     "$1" /validation/shim-com.exe "Z:\validation\winrtcamstub.dll" | tee /validation/dll.log

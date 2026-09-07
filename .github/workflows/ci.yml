@@ -77,6 +77,11 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             gcc-mingw-w64-x86-64 wine64 bubblewrap xvfb xauth
 
+      - name: Allow user namespaces for packaged bubblewrap
+        run: |
+          test "$(readlink -f "$(command -v bwrap)")" = /usr/bin/bwrap
+          sudo apparmor_parser -a .github/bwrap.apparmor
+
       - name: Run shim contracts without an application or host prefix
         env:
           CC: /usr/bin/x86_64-w64-mingw32-gcc
