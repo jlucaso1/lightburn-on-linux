@@ -16,7 +16,9 @@ case "$tool" in
   wineboot)
     [[ ${FAIL:-} != wineboot ]] || exit 31
     mkdir -p "$WINEPREFIX/drive_c/windows/system32" "$WINEPREFIX/dosdevices"
-    touch "$WINEPREFIX/system.reg"
+    if [[ ${DELAY_SYSTEM_REG:-} != 1 ]]; then
+      touch "$WINEPREFIX/system.reg"
+    fi
     ;;
   wine)
     if [[ $1 == reg ]]; then

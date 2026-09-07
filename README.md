@@ -9,6 +9,10 @@ LightBurn 2.1.04 opened and activated its normal trial in the original local
 check with Wine 11.17. The shim returns an empty camera list to avoid a startup
 crash. **Cameras are unsupported. Laser hardware has not been tested.**
 
+The same shim also passed unactivated startup and shutdown with 2.1.00.
+Version 2.0.05 needed Wine's Winmgmt service started first, which is not yet
+automated by the launcher. See [compatibility results](COMPATIBILITY.md).
+
 ## Install
 
 You need x86_64 Linux, Bash, GNU coreutils, Wine with `wineboot`, and an X11 or
@@ -30,6 +34,7 @@ the Wine prefix. Headless installation also needs `xvfb-run`, Xvfb, and `xauth`.
 Launching LightBurn requires a desktop display.
 
 Run `./scripts/install.sh` without an installer to repair an existing setup.
+Launch and repair use the installed application, regardless of the default version.
 An interrupted application install requires the installer again. Existing
 installations are not automatically upgraded.
 
@@ -62,7 +67,8 @@ bash tests/run.sh
 
 Set `WINRTCAMSTUB_DLL` to use a prebuilt shim during installation instead of
 compiling it. Version and checksum defaults live in `versions.env` and can be
-overridden through the environment. Other LightBurn versions are untested.
+overridden through the environment. Unknown versions require an explicit installer
+SHA-256. See [testing another version](COMPATIBILITY.md#testing-another-version).
 
 GitHub Actions checks Bash syntax, ShellCheck, isolated shell tests, and a real
 MinGW build with PE/export checks. A separate job tests the shim's COM interfaces

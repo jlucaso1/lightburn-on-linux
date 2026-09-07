@@ -3,12 +3,16 @@ set -euo pipefail
 # shellcheck source=common.sh
 source "$(dirname -- "$0")/common.sh"
 [[ $# -le 1 ]] || die "Usage: $0 [installer.exe]"
-check_version
 installer=${1:-${LB_WIN_EXE:-}}
 installing="$WINEPREFIX/.lightburn-installing"
 new_install=0
+if [[ -n $installer || ! -f $APP || -e $installing ]]; then
+  check_version
+fi
 if [[ ! -f $APP || -e $installing ]]; then
   new_install=1
+  [[ -n $LB_VERSION && $LB_VERSION != *[[:cntrl:]/\\]* ]] || die 'LB_VERSION must be nonempty and contain no control characters or path separators.'
+  [[ -n $LB_WIN_SHA256 ]] || die 'No installer checksum configured. Set LB_WIN_SHA256 for this LB_VERSION.'
   [[ -n $installer && -f $installer ]] || die 'Supply an installer path as an argument or LB_WIN_EXE.'
   [[ $installer == /* ]] || installer="$PWD/$installer"
   digest=$(sha256sum -- "$installer")

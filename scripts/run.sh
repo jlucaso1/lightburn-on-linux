@@ -2,10 +2,9 @@
 set -euo pipefail
 # shellcheck source=common.sh
 source "$(dirname -- "$0")/common.sh"
-check_version
 [[ ! -e $WINEPREFIX/.lightburn-installing ]] || die 'LightBurn installation is incomplete. Run install.sh with the installer again.'
 [[ -n ${DISPLAY:-} ]] || die 'DISPLAY is required to show LightBurn. Run from a graphical desktop session.'
-[[ -f $APP && -f $WINEPREFIX/system.reg ]] || die 'Prefix is not initialized with LightBurn. Run install.sh first.'
+{ prefix_initialized && [[ -f $APP ]]; } || die 'Prefix is not initialized with LightBurn. Run install.sh first.'
 mkdir -p -- "$LOG_DIR"
 printf 'Wine stdout and stderr are appended to %s/run.log\n' "$LOG_DIR" >&2
 wine_pid=

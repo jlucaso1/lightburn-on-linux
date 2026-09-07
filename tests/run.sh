@@ -39,6 +39,17 @@ fails_with() {
   "$@" || status=$?
   [[ $status == "$expected" ]]
 }
+selected_hash() {
+  # shellcheck disable=SC2016 # Expansion belongs to the child shell.
+  env -u LB_WIN_SHA256 LB_VERSION="$1" bash -c 'source "$1"; [[ $LB_WIN_SHA256 == "$2" ]]' _ "$WORK/repo/versions.env" "$2"
+}
+check '2.1.04 selects official checksum' selected_hash 2.1.04 1209eb5c8467a9aefa4eabbace5e982e232f8352db24797bb01f56671299b17b
+check '2.1.00 selects official checksum' selected_hash 2.1.00 00b22facdd24465195a1ce8e92546a9580d216c76ee1c82e505519b7ebcbd8ce
+check 'unknown version has no default checksum' selected_hash 2.99.00 ''
+# shellcheck disable=SC2016 # Expansion belongs to the child shell.
+check 'explicit checksum overrides known selection' bash -c 'source "$1"; [[ $LB_WIN_SHA256 == "$2" ]]' _ "$WORK/repo/versions.env" "${hash%% *}"
+# shellcheck disable=SC2016 # Expansion belongs to the child shell.
+check 'explicit empty checksum stays empty' env LB_WIN_SHA256= bash -c 'source "$1"; [[ -z $LB_WIN_SHA256 ]]' _ "$WORK/repo/versions.env"
 export FAIL=wineboot
 check 'wineboot failure is preserved' fails_with 31 install
 export FAIL=reg
@@ -106,9 +117,9 @@ check 'launcher preserves failure' fails_with 37 bash "$WORK/repo/scripts/run.sh
 unset RUN_STATUS
 export LB_VERSION=other
 : > "$TRACE"
-check 'mismatched version refuses repair' fails_with 1 install
-check 'mismatched version refuses launch' fails_with 1 bash "$WORK/repo/scripts/run.sh"
+check 'mismatched version refuses explicit installer' fails_with 1 install
 check 'mismatch invokes no tools' test ! -s "$TRACE"
+check 'mismatched configured version permits launch' bash "$WORK/repo/scripts/run.sh"
 export LB_VERSION=2.1.04
 printf 'packaged DLL\n' > "$WORK/packaged DLL.dll"
 export WINRTCAMSTUB_DLL="$WORK/packaged DLL.dll" CC=/nonexistent/compiler
@@ -166,6 +177,63 @@ check 'partial install retry succeeds by direct invocation' "$WORK/repo/scripts/
 check 'partial install retry runs installer again' grep -Fq "wine <$WORK/installer space.exe>" "$TRACE"
 check 'successful retry removes marker' test ! -e "$WINEPREFIX/.lightburn-installing"
 check 'successful retry stamps version' test -f "$WINEPREFIX/.lightburn-version"
+printf '2.1.00\n' > "$WINEPREFIX/.lightburn-version"
+: > "$TRACE"
+check '2.1.00 launches with default configuration' env -u LB_VERSION -u LB_WIN_SHA256 bash "$WORK/repo/scripts/run.sh"
+check '2.1.00 repairs with default configuration' env -u LB_VERSION -u LB_WIN_SHA256 bash "$WORK/repo/scripts/install.sh"
+check 'repair preserves 2.1.00 stamp' test "$(< "$WINEPREFIX/.lightburn-version")" = 2.1.00
+check 'repair never runs installer' fails_with 1 grep -Fq "wine <$WORK/installer space.exe>" "$TRACE"
+export WINEPREFIX="$WORK/delayed registry" DELAY_SYSTEM_REG=1
+check 'fresh install succeeds before registry flush' install
+check 'mock has not flushed system.reg' test ! -e "$WINEPREFIX/system.reg"
+check 'fresh prefix launches before registry flush' bash "$WORK/repo/scripts/run.sh"
+check 'fresh prefix maps serial before registry flush' bash "$WORK/repo/scripts/map-serial.sh" /dev/null com1
+unset DELAY_SYSTEM_REG
+export WINEPREFIX="$WORK/future version" LB_VERSION=2.99.00
+: > "$TRACE"
+check 'unknown install without checksum fails' fails_with 1 env -u LB_WIN_SHA256 bash "$WORK/repo/scripts/install.sh" "$WORK/installer space.exe" > "$WORK/output" 2>&1
+check 'unknown checksum error explains override' grep -q 'LB_WIN_SHA256' "$WORK/output"
+check 'unknown checksum failure invokes no tools' test ! -s "$TRACE"
+check 'unknown checksum failure creates no prefix' test ! -e "$WINEPREFIX"
+check 'empty checksum rejected' fails_with 1 env LB_WIN_SHA256= bash "$WORK/repo/scripts/install.sh" "$WORK/installer space.exe"
+check 'empty checksum invokes no tools' test ! -s "$TRACE"
+check 'empty checksum creates no prefix' test ! -e "$WINEPREFIX"
+for version in '' $'2.99.00\ninjected' $'2.99.00\r' '../2.99.00' '2\99'; do
+  check 'unsafe install version rejected' fails_with 1 env LB_VERSION="$version" bash "$WORK/repo/scripts/install.sh" "$WORK/installer space.exe"
+done
+check 'unsafe versions invoke no tools' test ! -s "$TRACE"
+check 'unsafe versions create no prefix' test ! -e "$WINEPREFIX"
+check 'future install accepts explicit checksum and LB_WIN_EXE' env LB_WIN_EXE="$WORK/installer space.exe" bash "$WORK/repo/scripts/install.sh"
+check 'future install stamps configured version' test "$(< "$WINEPREFIX/.lightburn-version")" = 2.99.00
+: > "$TRACE"
+check 'future installed app launches with defaults' env -u LB_VERSION -u LB_WIN_SHA256 bash "$WORK/repo/scripts/run.sh"
+check 'future installed app repairs with defaults' env -u LB_VERSION -u LB_WIN_SHA256 bash "$WORK/repo/scripts/install.sh"
+check 'unknown configured version repairs without checksum' env -u LB_WIN_SHA256 bash "$WORK/repo/scripts/install.sh"
+check 'future repair preserves stamp' test "$(< "$WINEPREFIX/.lightburn-version")" = 2.99.00
+check 'future repair does not execute installer' fails_with 1 grep -Fq "wine <$WORK/installer space.exe>" "$TRACE"
+export LB_VERSION=2.1.04
+: > "$TRACE"
+check 'future app refuses mismatched explicit installer' fails_with 1 install
+check 'future app refuses mismatched LB_WIN_EXE' fails_with 1 env LB_WIN_EXE="$WORK/installer space.exe" bash "$WORK/repo/scripts/install.sh"
+touch "$WINEPREFIX/.lightburn-installing"
+check 'interrupted install refuses mismatch without installer' fails_with 1 bash "$WORK/repo/scripts/install.sh" > "$WORK/output" 2>&1
+check 'interrupted mismatch explains separate prefix' grep -q 'separate WINEPREFIX' "$WORK/output"
+rm "$WINEPREFIX/.lightburn-installing" "$WINEPREFIX/drive_c/LightBurn/LightBurn.exe"
+check 'missing app refuses mismatch without installer' fails_with 1 bash "$WORK/repo/scripts/install.sh" > "$WORK/output" 2>&1
+check 'missing app mismatch explains separate prefix' grep -q 'separate WINEPREFIX' "$WORK/output"
+check 'all mismatched installs invoke no tools' test ! -s "$TRACE"
+export WINEPREFIX="$WORK/uninitialized"
+check 'uninitialized launcher rejected' fails_with 1 bash "$WORK/repo/scripts/run.sh"
+mkdir -p "$WINEPREFIX/drive_c/LightBurn"
+touch "$WINEPREFIX/system.reg" "$WINEPREFIX/drive_c/LightBurn/LightBurn.exe"
+check 'registry and app without dosdevices cannot launch' fails_with 1 bash "$WORK/repo/scripts/run.sh"
+check 'registry without dosdevices cannot map' fails_with 1 bash "$WORK/repo/scripts/map-serial.sh" /dev/null com1
+rm -r "$WINEPREFIX/drive_c"
+mkdir "$WINEPREFIX/dosdevices"
+check 'registry and dosdevices without drive_c cannot map' fails_with 1 bash "$WORK/repo/scripts/map-serial.sh" /dev/null com1
+check 'uninitialized operations invoke no tools' test ! -s "$TRACE"
+export WINEPREFIX="$WORK/partial install"
+printf '2.1.04\n' > "$WINEPREFIX/.lightburn-version"
 mkfifo "$WORK/ready" "$WORK/block" "$WORK/stopped"
 exec 7<> "$WORK/stopped" 8<> "$WORK/ready" 9<> "$WORK/block"
 set -m

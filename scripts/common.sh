@@ -22,6 +22,10 @@ export WINEPREFIX WINEARCH
 APP="$WINEPREFIX/drive_c/LightBurn/LightBurn.exe"
 STAMP="$WINEPREFIX/.lightburn-version"
 
+prefix_initialized() {
+  [[ -d $WINEPREFIX/drive_c && -d $WINEPREFIX/dosdevices ]]
+}
+
 check_version() {
   if [[ -e $STAMP ]]; then
     local installed
