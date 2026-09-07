@@ -14,7 +14,7 @@ done
 export PATH="$WORK/bin:$PATH" CC="$WORK/bin/compiler"
 export HOME="$WORK/home" XDG_DATA_HOME="$WORK/data space" XDG_STATE_HOME="$WORK/state space"
 export XDG_CACHE_HOME="$WORK/cache space" TRACE="$WORK/trace" DISPLAY=:123
-unset WINEPREFIX WINRTCAMSTUB_DLL
+unset WINEPREFIX WINRTCAMSTUB_DLL LIGHTBURN_LAUNCHER_EXE
 printf 'mock installer\n' > "$WORK/installer space.exe"
 hash=$(sha256sum "$WORK/installer space.exe")
 cp "$REPO/versions.env" "$WORK/repo/versions.env"
@@ -45,6 +45,7 @@ selected_hash() {
 }
 check '2.1.04 selects official checksum' selected_hash 2.1.04 1209eb5c8467a9aefa4eabbace5e982e232f8352db24797bb01f56671299b17b
 check '2.1.00 selects official checksum' selected_hash 2.1.00 00b22facdd24465195a1ce8e92546a9580d216c76ee1c82e505519b7ebcbd8ce
+check '2.0.05 selects recorded checksum' selected_hash 2.0.05 12207cf2ee9700a940f87bea424cdc3edaa8ff1476671a43f7547ef136b10df4
 check 'unknown version has no default checksum' selected_hash 2.99.00 ''
 # shellcheck disable=SC2016 # Expansion belongs to the child shell.
 check 'explicit checksum overrides known selection' bash -c 'source "$1"; [[ $LB_WIN_SHA256 == "$2" ]]' _ "$WORK/repo/versions.env" "${hash%% *}"
@@ -71,6 +72,12 @@ export LB_WIN_SHA256=${hash%% *} FAIL=compiler
 check 'compiler failure' fails_with 34 install
 check 'compiler failure creates no prefix' test ! -e "$WINEPREFIX"
 unset FAIL
+export FAIL=launcher-compiler
+: > "$TRACE"
+check 'helper build failure is preserved' fails_with 39 install
+check 'helper build failure creates no prefix' test ! -e "$WINEPREFIX"
+check 'helper build failure invokes no Wine' fails_with 1 grep -E '^(wine|wineboot) ' "$TRACE"
+unset FAIL
 export TARGET=aarch64-w64-mingw32
 check 'wrong compiler target' fails_with 1 install
 check 'wrong compiler target creates no prefix' test ! -e "$WINEPREFIX"
@@ -86,6 +93,7 @@ check 'one Xvfb session for entire setup' test "$(grep -c '^xvfb-run ' "$TRACE")
 check 'shim builds only once under Xvfb' test "$(grep -c '^compiler <-shared>' "$TRACE")" = 1
 check 'new successful install stamps version' test "$(< "$WINEPREFIX/.lightburn-version")" = 2.1.04
 check 'explicit prefix is honored' test -f "$WINEPREFIX/drive_c/LightBurn/LightBurn.exe"
+check 'helper is installed' test -s "$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
 check 'external build leaves source tree untouched' test ! -e "$WORK/repo/shim/winrtcamstub.dll"
 : > "$TRACE"
 check 'headless launcher is rejected' fails_with 1 bash "$WORK/repo/scripts/run.sh"
@@ -106,7 +114,29 @@ export DISPLAY=:123
 launch_status=0
 "$WORK/repo/scripts/run.sh" 'file with spaces.lbrn2' '--example=a b' > "$WORK/launcher.stdout" 2> "$WORK/launcher.stderr" || launch_status=$?
 check 'launcher forwards arguments by direct invocation' test "$launch_status" = 0
-check 'launcher argument boundaries' grep -Fq 'wine <C:\windows\system32\start.exe> </exec> <C:\LightBurn\LightBurn.exe> <file with spaces.lbrn2> <--example=a b>' "$TRACE"
+check 'launcher argument boundaries' grep -Fxq 'wine <C:\LightBurn\start-lightburn.exe> <file with spaces.lbrn2> <--example=a b>' "$TRACE"
+check 'service readiness precedes application' grep -Pzq 'service starting\nservice running\napplication launched\n' "$TRACE"
+: > "$TRACE"
+check 'repeated service initialization permits launch' bash "$WORK/repo/scripts/run.sh"
+check 'repeated launch initializes service' grep -Fxq 'service starting' "$TRACE"
+check 'already-running service permits application' grep -Pzq 'service already running\nservice running\napplication launched\n' "$TRACE"
+: > "$TRACE"
+check 'service failure is preserved' fails_with 38 env FAIL=service bash "$WORK/repo/scripts/run.sh"
+check 'service failure prevents application' fails_with 1 grep -Fxq 'application launched' "$TRACE"
+: > "$TRACE"
+check 'launch needs no compiler' env CC=/nonexistent/compiler FAIL=compiler bash "$WORK/repo/scripts/run.sh"
+check 'launch invokes no compiler' fails_with 1 grep -E '^(compiler|x86_64-w64-mingw32-gcc) ' "$TRACE"
+rm "$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
+: > "$TRACE"
+check 'missing helper refuses launch' fails_with 1 bash "$WORK/repo/scripts/run.sh" > "$WORK/output" 2>&1
+check 'missing helper explains repair' grep -Fq 'Run install.sh without an installer to repair' "$WORK/output"
+check 'missing helper invokes no tools' test ! -s "$TRACE"
+touch "$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
+check 'empty helper refuses launch' fails_with 1 bash "$WORK/repo/scripts/run.sh"
+check 'empty helper invokes no tools' test ! -s "$TRACE"
+check 'repair installs missing helper' bash "$WORK/repo/scripts/install.sh"
+check 'repaired helper is nonempty' test -s "$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
+check 'initialized repair does not reinitialize Wine' fails_with 1 grep -q '^wineboot ' "$TRACE"
 check 'launcher logs stderr' grep -q 'launcher stderr' "$XDG_STATE_HOME/lightburn-on-linux/run.log"
 check 'launcher logs stdout' grep -q 'launcher stdout' "$XDG_STATE_HOME/lightburn-on-linux/run.log"
 check 'launcher announces log on stderr' grep -Fq "$XDG_STATE_HOME/lightburn-on-linux/run.log" "$WORK/launcher.stderr"
@@ -122,10 +152,22 @@ check 'mismatch invokes no tools' test ! -s "$TRACE"
 check 'mismatched configured version permits launch' bash "$WORK/repo/scripts/run.sh"
 export LB_VERSION=2.1.04
 printf 'packaged DLL\n' > "$WORK/packaged DLL.dll"
-export WINRTCAMSTUB_DLL="$WORK/packaged DLL.dll" CC=/nonexistent/compiler
-check 'packaged DLL skips compiler and installer on repair' bash "$WORK/repo/scripts/install.sh"
+printf 'packaged launcher\n' > "$WORK/packaged launcher.exe"
+export WINRTCAMSTUB_DLL="$WORK/packaged DLL.dll" LIGHTBURN_LAUNCHER_EXE="$WORK/packaged launcher.exe" CC=/nonexistent/compiler
+: > "$TRACE"
+check 'packaged artifacts repair without compiler' bash "$WORK/repo/scripts/install.sh"
 check 'packaged DLL copied' cmp "$WINRTCAMSTUB_DLL" "$WINEPREFIX/drive_c/windows/system32/winrtcamstub.dll"
-unset WINRTCAMSTUB_DLL
+check 'packaged helper copied' cmp "$LIGHTBURN_LAUNCHER_EXE" "$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
+check 'packaged repair invokes no compiler' fails_with 1 grep -E '^(compiler|x86_64-w64-mingw32-gcc) ' "$TRACE"
+check 'packaged repaired app launches without compiler' bash "$WORK/repo/scripts/run.sh"
+touch "$WORK/empty.exe"
+for invalid in '' "$WORK/empty.exe" "$WORK/missing.exe" "$WORK"; do
+  : > "$TRACE"
+  check 'invalid supplied helper is rejected' fails_with 1 env WINEPREFIX="$WORK/invalid helper" LIGHTBURN_LAUNCHER_EXE="$invalid" bash "$WORK/repo/scripts/install.sh" "$WORK/installer space.exe"
+  check 'invalid supplied helper creates no prefix' test ! -e "$WORK/invalid helper"
+  check 'invalid supplied helper invokes no Wine' fails_with 1 grep -E '^(wine|wineboot) ' "$TRACE"
+done
+unset WINRTCAMSTUB_DLL LIGHTBURN_LAUNCHER_EXE
 export CC="$WORK/bin/compiler"
 check 'build accepts external output by direct invocation' "$WORK/repo/shim/build.sh" "$WORK/external DLL.dll"
 check 'external output exists' test -s "$WORK/external DLL.dll"
@@ -239,9 +281,11 @@ exec 7<> "$WORK/stopped" 8<> "$WORK/ready" 9<> "$WORK/block"
 set -m
 bash -c 'read -r -t 30 -u 9' &
 unrelated_pid=$!
+for phase in 1 startup; do
 for signal in INT TERM HUP; do
   case "$signal" in INT) status=130 ;; TERM) status=143 ;; HUP) status=129 ;; esac
-  SIGNAL_TEST=1 "$WORK/repo/scripts/run.sh" &
+  : > "$TRACE"
+  SIGNAL_TEST=$phase "$WORK/repo/scripts/run.sh" &
   launcher_pid=$!
   mock_pid=
   child_pid=
@@ -257,6 +301,11 @@ for signal in INT TERM HUP; do
   check "$signal launcher exit status" fails_with "$status" wait "$launcher_pid"
   check "$signal leaves no mock application child" fails_with 1 kill -0 "$child_pid"
   check "$signal leaves unrelated process alive" kill -0 "$unrelated_pid"
+  check "$signal preserves installed helper" test -s "$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
+  if [[ $phase == startup ]]; then
+    check "$signal during startup prevents application" fails_with 1 grep -Fxq 'application launched' "$TRACE"
+  fi
+done
 done
 kill -TERM "$unrelated_pid"
 wait "$unrelated_pid" 2>/dev/null || true
@@ -267,6 +316,7 @@ check 'launcher waits while application is open' kill -0 "$launcher_pid"
 printf 'close\n' >&9
 check 'application close preserves exit status' fails_with 37 wait "$launcher_pid"
 check 'close leaves no mock application child' fails_with 1 kill -0 "$child_pid"
+check 'close preserves installed helper' test -s "$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
 set +m
 exec 7>&- 8>&- 9>&-
 printf '%s passed, %s failed\n' "$passed" "$failed"

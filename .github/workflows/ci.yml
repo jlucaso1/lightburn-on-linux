@@ -57,8 +57,13 @@ jobs:
           ' .github/.cache/shim-pe.txt
           git diff --exit-code
 
-      - name: Compile shim contract tests with strict warnings
+      - name: Compile native launcher and contract tests with strict warnings
         run: |
+          CC=/usr/bin/x86_64-w64-mingw32-gcc bash scripts/build-launcher.sh .github/.cache/start-lightburn.exe
+          /usr/bin/x86_64-w64-mingw32-gcc -Wall -Wextra -Werror -O2 \
+            -o .github/.cache/helper-service.exe tests/helper-service.c -ladvapi32
+          /usr/bin/x86_64-w64-mingw32-gcc -Wall -Wextra -Werror -O2 \
+            -o .github/.cache/start-lightburn-tests.exe tests/start-lightburn.c -ladvapi32
           /usr/bin/x86_64-w64-mingw32-gcc -Wall -Wextra -Werror -O2 \
             -o .github/.cache/shim-com.exe tests/shim-com.c \
             -lwindowsapp -luser32 -lkernel32

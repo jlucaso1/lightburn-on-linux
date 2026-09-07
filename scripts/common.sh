@@ -20,6 +20,8 @@ LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/lightburn-on-linux"
 export WINEPREFIX WINEARCH
 # shellcheck disable=SC2034 # Used by install.sh and run.sh.
 APP="$WINEPREFIX/drive_c/LightBurn/LightBurn.exe"
+# shellcheck disable=SC2034 # Used by install.sh and run.sh.
+LAUNCHER="$WINEPREFIX/drive_c/LightBurn/start-lightburn.exe"
 STAMP="$WINEPREFIX/.lightburn-version"
 
 prefix_initialized() {

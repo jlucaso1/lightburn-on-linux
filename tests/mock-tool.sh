@@ -25,11 +25,19 @@ case "$tool" in
       [[ ${FAIL:-} != reg ]] || exit 32
     elif [[ $1 == --version ]]; then
       printf 'wine-mock\n'
-    elif [[ $1 == 'C:\LightBurn\LightBurn.exe' || $1 == 'C:\windows\system32\start.exe' ]]; then
-      if [[ $1 == 'C:\windows\system32\start.exe' ]]; then
-        [[ $2 == /exec && $3 == 'C:\LightBurn\LightBurn.exe' ]] || exit 95
+    elif [[ $1 == 'C:\LightBurn\LightBurn.exe' || $1 == 'C:\LightBurn\start-lightburn.exe' ]]; then
+      if [[ $1 == 'C:\LightBurn\start-lightburn.exe' ]]; then
+        printf 'service starting\n' >> "$TRACE"
+        [[ ${FAIL:-} != service ]] || exit 38
+        if [[ ${SIGNAL_TEST:-} != startup ]]; then
+          if [[ -e $WINEPREFIX/.mock-winmgmt-running ]]; then
+            printf 'service already running\n' >> "$TRACE"
+          fi
+          touch "$WINEPREFIX/.mock-winmgmt-running"
+          printf 'service running\napplication launched\n' >> "$TRACE"
+        fi
       fi
-      if [[ ${SIGNAL_TEST:-} == 1 ]]; then
+      if [[ ${SIGNAL_TEST:-} == 1 || ${SIGNAL_TEST:-} == startup ]]; then
         trap ':' INT
         bash -c 'read -r -t 10 -u 9' &
         child=$!
@@ -54,6 +62,7 @@ case "$tool" in
       exit 0
     fi
     [[ ${FAIL:-} != compiler ]] || exit 34
+    if [[ ${FAIL:-} == launcher-compiler && $1 != -shared ]]; then exit 39; fi
     while [[ $# -gt 0 ]]; do
       if [[ $1 == -o ]]; then
         printf 'mock DLL\n' > "$2"

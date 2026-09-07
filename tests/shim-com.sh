@@ -14,6 +14,9 @@ printf 'Shim test artifacts in %s\n' "$work"
 mkdir -p "$work/home" "$work/tmp" "$work/runtime"
 chmod 700 "$work/runtime"
 CC="$cc" bash "$repo/shim/build.sh" "$work/winrtcamstub.dll"
+CC="$cc" bash "$repo/scripts/build-launcher.sh" "$work/start-lightburn.exe"
+"$cc" -Wall -Wextra -Werror -O2 -o "$work/helper-service.exe" "$repo/tests/helper-service.c" -ladvapi32
+"$cc" -Wall -Wextra -Werror -O2 -o "$work/start-lightburn-tests.exe" "$repo/tests/start-lightburn.c" -ladvapi32
 "$cc" -Wall -Wextra -Werror -O2 -o "$work/shim-com.exe" "$repo/tests/shim-com.c" \
   -lwindowsapp -luser32 -lkernel32
 
@@ -43,6 +46,8 @@ exec bwrap --unshare-all --die-with-parent --new-session --cap-drop ALL \
     done
     grep -Eq "^NoNewPrivs:[[:space:]]+1$" /proc/self/status
     "$1" --version
+    "$1" /validation/helper-service.exe | tee /validation/helper-service.log
+    "$1" /validation/start-lightburn-tests.exe | tee /validation/launcher.log
     "$1" /validation/shim-com.exe | tee /validation/source.log
     "$1" /validation/shim-com.exe "Z:\validation\winrtcamstub.dll" | tee /validation/dll.log
   ' shim-tests "$wine"

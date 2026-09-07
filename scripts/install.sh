@@ -32,28 +32,40 @@ build_dir=
 trap 'if [[ -n $build_dir ]]; then rm -rf -- "$build_dir"; fi' EXIT
 if [[ ${WINRTCAMSTUB_DLL+x} ]]; then
   [[ -f $WINRTCAMSTUB_DLL && -s $WINRTCAMSTUB_DLL ]] || die 'WINRTCAMSTUB_DLL must name a nonempty DLL file.'
-  dll=$WINRTCAMSTUB_DLL
-else
+fi
+if [[ ${LIGHTBURN_LAUNCHER_EXE+x} ]]; then
+  [[ -f $LIGHTBURN_LAUNCHER_EXE && -s $LIGHTBURN_LAUNCHER_EXE ]] || die 'LIGHTBURN_LAUNCHER_EXE must name a nonempty EXE file.'
+fi
+if [[ ! ${WINRTCAMSTUB_DLL+x} || ! ${LIGHTBURN_LAUNCHER_EXE+x} ]]; then
   cache="${XDG_CACHE_HOME:-$HOME/.cache}/lightburn-on-linux"
   [[ $cache == /* ]] || die 'XDG_CACHE_HOME must be an absolute path.'
   mkdir -p -- "$cache"
   build_dir=$(mktemp -d "$cache/build.XXXXXX")
-  dll="$build_dir/winrtcamstub.dll"
+fi
+dll=${WINRTCAMSTUB_DLL:-$build_dir/winrtcamstub.dll}
+launcher=${LIGHTBURN_LAUNCHER_EXE:-$build_dir/start-lightburn.exe}
+if [[ ! ${WINRTCAMSTUB_DLL+x} ]]; then
   bash "$REPO/shim/build.sh" "$dll"
+fi
+if [[ ! ${LIGHTBURN_LAUNCHER_EXE+x} ]]; then
+  bash "$REPO/scripts/build-launcher.sh" "$launcher"
 fi
 
 mkdir -p -- "$LOG_DIR"
 printf 'Installer output is appended to %s/install.log\n' "$LOG_DIR" >&2
 exec >> "$LOG_DIR/install.log" 2>&1
 mkdir -p -- "$WINEPREFIX"
-wineboot --init
+if ! prefix_initialized || [[ ! -d $WINEPREFIX/drive_c/windows/system32 ]]; then
+  wineboot --init
+fi
 if [[ $new_install == 1 ]]; then
   touch -- "$installing"
   wine "$installer" /VERYSILENT /NORESTART /SUPPRESSMSGBOXES '/DIR=C:\LightBurn'
   [[ -f $APP ]] || die 'Installer completed without creating LightBurn.exe.'
-  rm -- "$installing"
 fi
 [[ -f $APP ]] || die 'Installer completed without creating LightBurn.exe.'
+cp -- "$launcher" "$LAUNCHER"
+if [[ $new_install == 1 ]]; then rm -- "$installing"; fi
 cp -- "$dll" "$WINEPREFIX/drive_c/windows/system32/winrtcamstub.dll"
 for class in Windows.Media.Capture.Frames.MediaFrameSourceGroup Windows.Devices.Enumeration.DeviceInformation; do
   wine reg add "HKLM\\Software\\Microsoft\\WindowsRuntime\\ActivatableClassId\\$class" \

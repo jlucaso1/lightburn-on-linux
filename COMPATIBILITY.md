@@ -1,22 +1,23 @@
 # Compatibility
 
-These checks used Wine 11.17 on x86_64 Linux and one unchanged shim DLL built with
-LLVM-MinGW Clang 22.1.7. Each application ran without external network access or
+These checks used Wine 11.17 on x86_64 Linux and the same shim and native launcher
+for all three versions, built with LLVM-MinGW Clang 22.1.7.
+Each application ran without external network access or
 host hardware. No trial or license was activated during these checks.
 
 | LightBurn | Installation | Startup after 35 seconds | Closing the license dialog |
 | --- | --- | --- | --- |
 | 2.1.04 | Passed | License Management | Exit 0 |
 | 2.1.00 | Passed | License Management | Exit 0 |
-| 2.0.05, Winmgmt stopped | Passed | License System Error | Exit 1 |
-| 2.0.05, Winmgmt started normally | Existing installation | License Management | Exit 0 |
+| 2.0.05 | Passed | License Management | Exit 0 |
 
 The maintainer separately confirmed editor use and shutdown with 2.1.04.
 The isolated checks do not establish editor, licensed-feature, or laser support.
 
-Both 2.1 versions also passed no-argument shim repair and subsequent launch
+All three versions also passed no-argument repair and subsequent launch
 without version overrides. Repair preserved the installed executable and version
-record and did not run a LightBurn installer.
+record and did not run a LightBurn installer. Launch succeeded with no working
+compiler configured, and closing left no native-helper or application processes.
 
 ## The 2.0.05 failure
 
@@ -31,11 +32,21 @@ the existing Wine builtin service through `StartServiceW` and waiting for
 A subsequent stopped-service control reproduced the original error. Version
 2.1.00 opened with either service state.
 
-This startup remedy has been verified in isolation but is not yet integrated
-into the launcher. It changes no WMI identity, provider implementation, license
-checks, or activation state. The exact private licensing predicate remains
-unknown; the observed service-state dependency is enough to test a normal
-service-startup solution without modifying the application.
+The native launcher now starts Winmgmt through the service-control API and
+requires `SERVICE_RUNNING` before starting LightBurn. It waits for native status
+notifications if startup is pending. It does not change service configuration,
+WMI identity, provider implementation, license checks, or activation state.
+The exact private licensing predicate remains unknown.
+
+A private Windows job owns the helper and its descendants. Closing or interrupting
+this launch does not terminate other applications in the same Wine prefix.
+The helper is built during installation, not on every launch. Existing prefixes
+need a no-argument repair to install it.
+
+Automated tests run the production helper against real Wine services with a
+synthetic application. First and repeated launches passed on Wine 9.0 and 11.17.
+Pending states and failure paths also have focused tests. This does not make
+Wine 9.0 a tested runtime for the proprietary application itself.
 
 ## Testing another version
 
