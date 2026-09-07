@@ -1,0 +1,12 @@
+.work/
+.cache/
+*.exe
+*.dll
+*.pdb
+*.7z
+*.zip
+*.log
+shim/shim.map
+*~
+.DS_Store
+Thumbs.db

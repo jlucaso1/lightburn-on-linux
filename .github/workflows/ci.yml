@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install check and build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y shellcheck gcc-mingw-w64-x86-64
+
+      - name: Check shell syntax and sources
+        run: |
+          for script in scripts/*.sh shim/*.sh tests/*.sh versions.env; do
+            bash -n "$script"
+          done
+          shellcheck --shell=bash --external-sources --source-path=SCRIPTDIR \
+            scripts/*.sh shim/*.sh tests/*.sh versions.env
+
+      - name: Run isolated shell tests
+        run: bash tests/run.sh
+
+      - name: Compile shim and check PE exports
+        env:
+          CC: /usr/bin/x86_64-w64-mingw32-gcc
+        run: |
+          mkdir -p .github/.cache
+          dll="$PWD/.github/.cache/winrtcamstub.dll"
+          bash shim/build.sh "$dll"
+          /usr/bin/x86_64-w64-mingw32-objdump -p "$dll" > .github/.cache/shim-pe.txt
+          grep -Eq 'file format pei-x86-64' .github/.cache/shim-pe.txt
+          awk '
+            /^\[Ordinal\/Name Pointer\]/ { exports = 1; next }
+            exports && NF == 0 { exports = 0 }
+            exports && $NF == "DllGetActivationFactory" { found = 1 }
+            END { exit !found }
+          ' .github/.cache/shim-pe.txt
+          git diff --exit-code
+
+      - name: Compile shim contract tests with strict warnings
+        run: |
+          /usr/bin/x86_64-w64-mingw32-gcc -Wall -Wextra -Werror -O2 \
+            -o .github/.cache/shim-com.exe tests/shim-com.c \
+            -lwindowsapp -luser32 -lkernel32
+
+  shim-runtime:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install isolated shim test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            gcc-mingw-w64-x86-64 wine64 bubblewrap xvfb xauth
+
+      - name: Run shim contracts without an application or host prefix
+        env:
+          CC: /usr/bin/x86_64-w64-mingw32-gcc
+        run: timeout --kill-after=10s 240s bash tests/shim-com.sh
