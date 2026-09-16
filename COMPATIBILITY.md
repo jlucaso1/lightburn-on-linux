@@ -7,17 +7,16 @@ host hardware. No trial or license was activated during these checks.
 
 | LightBurn | Installation | Startup after 35 seconds | Closing |
 | --- | --- | --- | --- |
-| 2.2.00-RC-1 | Passed | Editor opened | Exit 0 |
+| 2.2.00-RC-1 | Passed | License Management | Exit 0 |
 | 2.1.04 | Passed | License Management | Exit 0 |
 | 2.1.00 | Passed | License Management | Exit 0 |
 | 2.0.05 | Passed | License Management | Exit 0 |
 
 The 2.2.00-RC-1 row comes from a separate prefix with the same shim and native
-launcher. After installation, LightBurn PreRelease opened its editor window and
-the maintainer confirmed it was usable; closing returned exit 0 and left no
-helper or application processes. Whether the RC shows License Management on a
-fresh trial was not isolated, so the startup cell records the observed editor
-window instead of a license dialog.
+launcher. Installation passed, LightBurn PreRelease reached License Management
+without an activated license, and the maintainer then opened the editor and
+confirmed it was usable. Closing returned exit 0 and left no helper or
+application processes.
 
 The maintainer separately confirmed editor use and shutdown with 2.1.04.
 The isolated checks do not establish editor, licensed-feature, or laser support.
