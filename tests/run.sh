@@ -43,6 +43,7 @@ selected_hash() {
   # shellcheck disable=SC2016 # Expansion belongs to the child shell.
   env -u LB_WIN_SHA256 LB_VERSION="$1" bash -c 'source "$1"; [[ $LB_WIN_SHA256 == "$2" ]]' _ "$WORK/repo/versions.env" "$2"
 }
+check '2.2.00-RC-1 selects recorded checksum' selected_hash 2.2.00-RC-1 e8c54f8cee195be834938f4957fac9c084ba1baefc452004f374d9d359eaed11
 check '2.1.04 selects official checksum' selected_hash 2.1.04 1209eb5c8467a9aefa4eabbace5e982e232f8352db24797bb01f56671299b17b
 check '2.1.00 selects official checksum' selected_hash 2.1.00 00b22facdd24465195a1ce8e92546a9580d216c76ee1c82e505519b7ebcbd8ce
 check '2.0.05 selects recorded checksum' selected_hash 2.0.05 12207cf2ee9700a940f87bea424cdc3edaa8ff1476671a43f7547ef136b10df4

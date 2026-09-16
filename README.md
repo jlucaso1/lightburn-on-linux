@@ -10,7 +10,9 @@ check with Wine 11.17. The shim returns an empty camera list to avoid a startup
 crash. **Cameras are unsupported. Laser hardware has not been tested.**
 
 Versions 2.0.05, 2.1.00, and 2.1.04 passed unactivated startup and shutdown with
-the same shim and native launcher. See [compatibility results](COMPATIBILITY.md).
+the same shim and native launcher. The 2.2.00-RC-1 prerelease also installed and
+opened its editor, but it is not the default version. See
+[compatibility results](COMPATIBILITY.md).
 
 ## Install
 

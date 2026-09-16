@@ -1,15 +1,23 @@
 # Compatibility
 
 These checks used Wine 11.17 on x86_64 Linux and the same shim and native launcher
-for all three versions, built with LLVM-MinGW Clang 22.1.7.
+for all listed versions, built with LLVM-MinGW Clang 22.1.7.
 Each application ran without external network access or
 host hardware. No trial or license was activated during these checks.
 
-| LightBurn | Installation | Startup after 35 seconds | Closing the license dialog |
+| LightBurn | Installation | Startup after 35 seconds | Closing |
 | --- | --- | --- | --- |
+| 2.2.00-RC-1 | Passed | Editor opened | Exit 0 |
 | 2.1.04 | Passed | License Management | Exit 0 |
 | 2.1.00 | Passed | License Management | Exit 0 |
 | 2.0.05 | Passed | License Management | Exit 0 |
+
+The 2.2.00-RC-1 row comes from a separate prefix with the same shim and native
+launcher. After installation, LightBurn PreRelease opened its editor window and
+the maintainer confirmed it was usable; closing returned exit 0 and left no
+helper or application processes. Whether the RC shows License Management on a
+fresh trial was not isolated, so the startup cell records the observed editor
+window instead of a license dialog.
 
 The maintainer separately confirmed editor use and shutdown with 2.1.04.
 The isolated checks do not establish editor, licensed-feature, or laser support.
@@ -54,8 +62,10 @@ Download an installer from the [official release archive](https://release.lightb
 Keep experimental versions in separate prefixes and review the applicable EULA.
 A new prefix is not permission to restart a trial or exceed activation limits.
 
-For [2.1.00](https://release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.1.00/),
-the checksum is already recorded in `versions.env`.
+For [2.1.00](https://release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.1.00/)
+and [2.2.00-RC-1](https://release.lightburnsoftware.com/LightBurn/RC/LightBurn-v2.2.00-RC-1/),
+the checksums are already recorded in `versions.env`. Prerelease builds live under
+the RC archive and are not the default version.
 
 ```bash
 export WINEPREFIX="$HOME/.local/share/lightburn-2.1.00/wineprefix"
@@ -82,5 +92,6 @@ downloads; the proprietary files are not included in this repository.
 
 | Version | Official installer | SHA-256 |
 | --- | --- | --- |
+| 2.2.00-RC-1 | [Download](https://release.lightburnsoftware.com/LightBurn/RC/LightBurn-v2.2.00-RC-1/LightBurn-v2.2.00-RC-1-02356f3.exe) | `e8c54f8cee195be834938f4957fac9c084ba1baefc452004f374d9d359eaed11` |
 | 2.1.00 | [Download](https://files.release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.1.00/LightBurn-v2.1.00.exe) | `00b22facdd24465195a1ce8e92546a9580d216c76ee1c82e505519b7ebcbd8ce` |
 | 2.0.05 | [Download](https://files.release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.0.05/LightBurn-v2.0.05.exe) | `12207cf2ee9700a940f87bea424cdc3edaa8ff1476671a43f7547ef136b10df4` |
