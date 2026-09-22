@@ -21,7 +21,7 @@ application processes.
 The maintainer separately confirmed editor use and shutdown with 2.1.04.
 The isolated checks do not establish editor, licensed-feature, or laser support.
 
-All three versions also passed no-argument repair and subsequent launch
+All four versions also passed no-argument repair and subsequent launch
 without version overrides. Repair preserved the installed executable and version
 record and did not run a LightBurn installer. Launch succeeded with no working
 compiler configured, and closing left no native-helper or application processes.
@@ -92,5 +92,6 @@ downloads; the proprietary files are not included in this repository.
 | Version | Official installer | SHA-256 |
 | --- | --- | --- |
 | 2.2.00-RC-1 | [Download](https://release.lightburnsoftware.com/LightBurn/RC/LightBurn-v2.2.00-RC-1/LightBurn-v2.2.00-RC-1-02356f3.exe) | `e8c54f8cee195be834938f4957fac9c084ba1baefc452004f374d9d359eaed11` |
+| 2.1.04 | [Download](https://files.release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.1.04/LightBurn-v2.1.04.exe) | `1209eb5c8467a9aefa4eabbace5e982e232f8352db24797bb01f56671299b17b` |
 | 2.1.00 | [Download](https://files.release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.1.00/LightBurn-v2.1.00.exe) | `00b22facdd24465195a1ce8e92546a9580d216c76ee1c82e505519b7ebcbd8ce` |
 | 2.0.05 | [Download](https://files.release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.0.05/LightBurn-v2.0.05.exe) | `12207cf2ee9700a940f87bea424cdc3edaa8ff1476671a43f7547ef136b10df4` |
